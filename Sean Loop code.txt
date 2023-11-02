@@ -1,0 +1,46 @@
+# Start of OUTER loop
+for YEAR in tqdm_notebook(YEARS_TO_GET, desc='YEARS', position=0):
+    # Defining the JSON file to store results for the year
+    JSON_FILE = f'{FOLDER}tmdb_api_results_{YEAR}.json'
+    
+    # Check if the file exists
+    file_exists = os.path.isfile(JSON_FILE)
+    
+    # If it does not exist: create it
+    if not file_exists:  # Simplified condition
+        # Save an empty dict with just "imdb_id" to the new json file.
+        with open(JSON_FILE, 'w') as f:
+            json.dump([{'imdb_id': 0}], f)
+
+    # Saving the new year as the current df
+    df = basics.loc[basics['startYear'] == YEAR].copy()
+    # Saving movie ids to list
+    movie_ids = df['tconst'].copy()
+
+    # Load existing data from json into a dataframe called "previous_df"
+    previous_df = pd.read_json(JSON_FILE)
+
+    # Filter out any ids that are already in the JSON_FILE
+    movie_ids_to_get = movie_ids[~movie_ids.isin(previous_df['imdb_id'])]
+
+# Get index and movie id from the list
+    # INNER Loop
+    for movie_id in tqdm_notebook(movie_ids_to_get,
+                                  desc=f'Movies from {YEAR}',
+                                  position=1,
+                                  leave=True):
+        try:
+            # Retrieve the data for the movie id
+            temp = get_movie_with_rating(movie_id)
+            # Append/extend results to the existing file using a pre-made function
+            write_json(temp, JSON_FILE)
+            # Short 20 ms sleep to prevent overwhelming the server
+            time.sleep(0.02)
+
+        except Exception as e:
+            errors.append([movie_id, e])
+
+    final_year_df = pd.read_json(JSON_FILE)
+    final_year_df.to_csv(f"{FOLDER}final_tmdb_data_{YEAR}.csv.gz", compression="gzip", index=False)
+
+print(f"- Total errors: {len(errors)}")
